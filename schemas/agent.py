@@ -2,12 +2,14 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 
+
+
 class UserRegister(BaseModel):
     username:str
     email:EmailStr
     password:str
 
-class UserRespone(BaseModel):
+class UserResponse(BaseModel):
     id:int
     username:str
     email:str

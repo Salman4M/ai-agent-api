@@ -17,7 +17,7 @@ from core.security import (
 )
 from core.config import settings 
 from models.conversation import User, RefreshToken
-from schemas.user import UserRegister,UserResponse,UserLogin,TokenResponse
+from schemas.agent import UserRegister,UserResponse,TokenResponse
 
 
 router = APIRouter(prefix="/auth",tags=["auth"])
