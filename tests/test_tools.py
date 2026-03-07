@@ -3,6 +3,7 @@ from agent.tools.calculator import calculator
 from agent.tools.code_executor import code_executor
 from agent.tools.web_search import web_search
 
+#calculator tests
 
 def test_calculator_addition():
     assert calculator("2 + 3") == "5"
@@ -26,6 +27,9 @@ def test_calculator_blocks_import():
 def test_calculator_blocks_function_call():
     result = calculator("len(hello)")
     assert "Error" in result
+
+
+#code executor tests
 
 def test_calculator_complex_expression():
     assert calculator("(100 + 50) * 2 / 3") == "100.0"
@@ -53,6 +57,9 @@ def test_code_executor_timout():
 def test_code_executor_syntax_error():
     result = code_executor("def broken(")
     assert "Error" in result
+
+
+#web search tests
 
 
 def test_web_search_returns_results():

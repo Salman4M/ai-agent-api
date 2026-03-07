@@ -241,4 +241,4 @@ pytest tests/ -v
 
 ## Related Project
 
-[RAG Document Assistant](https://github.com/Salman4M/rag-document-asistant) — semantic document search with FastAPI, ChromaDB, and local LLMs.
+[RAG Document Assistant](https://github.com/Salman4M/RAG-Document-Assistant) — semantic document search with FastAPI, ChromaDB, and local LLMs.

@@ -5,3 +5,5 @@ plan.md
 __pycache__/
 alembic.ini
 *.pyc
+.pytest_cache/
+alembic/versions
