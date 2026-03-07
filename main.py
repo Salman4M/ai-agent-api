@@ -1,6 +1,13 @@
-def main():
-    print("Hello from ai-agent-api!")
+from fastapi import FastAPI
+from routes.auth import router as auth_router
+from routes.agent import router as agent_router
 
 
-if __name__ == "__main__":
-    main()
+app = FastAPI(title="AI Agent API")
+
+app.include_router(auth_router)
+app.include_router(agent_router)
+
+@app.get("/health")
+async def health():
+    return {"status":"ok"}

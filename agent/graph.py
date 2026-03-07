@@ -6,6 +6,8 @@ from agent.tools.calculator import calculator
 from agent.tools.web_search import web_search
 from agent.tools.code_executor import code_executor
 from core.config import settings
+from services.memory_service import get_session_messages, save_session_messages
+from services.conversation_service import save_conversation
 
 TOOLS = {
     "web_search":web_search,
@@ -163,3 +165,39 @@ def build_graph():
     return graph.compile()
 
 agent = build_graph()
+
+
+
+async def run_agent(
+        question:str,
+        user_id:str,
+        session_id:str,
+        db
+)->dict:
+    #load session history from Redis (fallback to postgresql)
+    messages = await get_session_messages(user_id,session_id,db)
+
+    state = AgentState(
+        question = question,
+        messages = messages, 
+        tool_calls=[],
+        final_answer=None,
+        user_id = user_id,
+        session_id=session_id,
+        steps=0,
+        _pending_tool = None
+    )
+
+    result = agent.invoke(state)
+
+    await save_session_messages(user_id,session_id ,result["messages"])
+
+    await save_conversation(
+        db = db,
+        user_id = user_id,
+        session_id=session_id,
+        question=question,
+        answer=result["final_answer"] or "",
+        steps=result["tool_calls"]
+    )
+    return result

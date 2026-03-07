@@ -26,7 +26,7 @@ async def get_recent_conversations(
         user_id:int,
         limit:int = 3
 ) -> list[dict]:
-    result = db.execute(
+    result = await db.execute(
         select(Conversation)
         .where(Conversation.user_id==user_id)
         .order_by(Conversation.created_at.desc())
