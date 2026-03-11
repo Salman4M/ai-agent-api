@@ -1,10 +1,14 @@
 import os
-from google.adk.agents import Agent
+os.environ["OLLAMA_API_BASE"] = "http://localhost:11434"
+from google.adk.agents import LlmAgent,Agent
 from google.adk.models.lite_llm import LiteLlm
 from agent_v2.tools import web_search,calculator,code_executor
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from mcp import StdioServerParameters
+from google.adk.tools.mcp_tool import McpToolset
 
-def create_agent()->Agent:
-    return Agent(
+
+root_agent = LlmAgent(
         name="research_agent",
         model=LiteLlm(model="groq/llama-3.3-70b-versatile"),
         description="A research agent that can search the web, do math and execute code.",
@@ -15,10 +19,18 @@ def create_agent()->Agent:
         - Use code_executor to run Python code when needed
         - Always provide a clear, complete final answer
         """,
-        tools=[web_search,calculator,code_executor]
+        tools=[
+            McpToolset(
+                connection_params=StdioConnectionParams(
+                    server_params=StdioServerParameters(
+                        command="python",
+                        args=["-m","mcp_server.server"]
+                    )
+                )
+            )
+        ]
 
     )
 
-agent = create_agent()
+agent = root_agent
 
-root_agent = agent
