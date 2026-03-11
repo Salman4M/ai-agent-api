@@ -1,10 +1,18 @@
 # AI Agent API
 
-A FastAPI-based Personal Research Agent that reasons step by step, decides which tools to use, executes them, and returns a final answer with full reasoning trace.
+A FastAPI-based Personal Research Agent tbuilt in two versions — V1 from scratch with raw LangGraph, V2 with Google ADK and MCP tools.
 
-Built from scratch without hiding complexity — raw LangGraph, Redis, PostgreSQL, and Ollama.
+The agent reasons step by step, decides which tools to use, executes them, and returns a final answer.
 
 ---
+## Versions
+
+| Version | Stack | Status |
+|---|---|---|
+| V1 | LangGraph + Ollama + manual tools | Complete |
+| V2 | Google ADK + Groq + FastMCP + MCP protocol | Complete |
+
+Both versions live on `main`. V1 endpoints at `/agent/`, V2 at `/v2/agent/`.
 
 ## How It Works
 
@@ -24,22 +32,16 @@ Repeat until satisfied
 Final answer + full reasoning trace
 ```
 
----
+**V1** — LangGraph manually defines every node, edge, and state transition. Full control, maximum learning value.
 
-## Features
-
-- **ReAct agent loop** — LangGraph-based reasoning and acting cycle
-- **Tool calling** — web search, calculator, safe code execution
-- **Two-layer memory** — Redis for active sessions, PostgreSQL for permanent history
-- **PostgreSQL context fallback** — when Redis session expires, last 3 conversations injected as context so LLM is never completely blank
-- **JWT authentication** — register, login, refresh tokens, logout
-- **Per-user isolation** — users only see their own conversations
-- **Full reasoning trace** — every tool call and result returned in response
+**V2** — Google ADK handles the ReAct loop. Tools are exposed via a FastMCP server over MCP protocol. Agent connects to the MCP server and discovers tools dynamically.
 
 ---
+
 
 ## Tech Stack
 
+### V1
 | Tool | Purpose |
 |---|---|
 | FastAPI | API framework |
@@ -49,7 +51,18 @@ Final answer + full reasoning trace
 | PostgreSQL + SQLAlchemy | Persistent conversation storage |
 | JWT | Authentication |
 | Docker | PostgreSQL + Redis containers |
-| pytest | Tests |
+| pytest | 28 passing tests |
+
+
+### V2
+| Tool | Purpose |
+|---|---|
+| FastAPI | API framework |
+| Google ADK | Agent orchestration framework |
+| Groq + llama-3.3-70b-versatile | LLM inference |
+| FastMCP | MCP server exposing tools |
+| MCP Protocol | Tool discovery and execution |
+| JWT | Authentication (shared with V1) |
 
 ---
 
@@ -64,13 +77,18 @@ ai-agent-api/
 │   ├── security.py         # JWT auth
 │   ├── limiter.py          # rate limiting
 │   └── redis.py            # Redis connection
-├── agent/
+├── agent/                  # V1 LangGraph agent
 │   ├── graph.py            # LangGraph ReAct loop
-│   ├── state.py            # agent state schema
+│   ├── state.py            # agent state TypedDict
 │   └── tools/
 │       ├── calculator.py   # safe math evaluation (AST-based)
 │       ├── web_search.py   # DuckDuckGo search
-│       └── code_executor.py # safe Python execution (subprocess)
+│       └── code_executor.py# safe Python execution (subprocess)
+├── agent_v2/               # V2 Google ADK agent
+│   ├── agent.py            # ADK LlmAgent + McpToolset
+│   └── tools.py            # tool functions with docstrings
+├── mcp_server/
+│   └── server.py           # FastMCP server exposing tools
 ├── services/
 │   ├── memory_service.py       # Redis session memory
 │   ├── conversation_service.py # PostgreSQL operations
@@ -80,12 +98,12 @@ ai-agent-api/
 ├── schemas/
 │   └── agent.py            # Pydantic schemas
 ├── routes/
-│   ├── agent.py            # agent endpoints
+│   ├── agent.py            # V1 endpoints
+│   ├── agent_v2.py         # V2 endpoints
 │   └── auth.py             # auth endpoints
 └── tests/
     ├── test_tools.py
     ├── test_agent.py
-    ├── test_memory.py
     └── test_routes.py
 ```
 
@@ -96,44 +114,23 @@ ai-agent-api/
 **Requirements:**
 - Docker
 - Python 3.12+
-- Ollama with llama3.1 model
+- Ollama with llama3.1 model (V1)
+- Groq API key (V2)
 
-**1 — Clone and create virtual environment:**
+
 ```bash
 git clone https://github.com/YOUR_USERNAME/ai-agent-api
 cd ai-agent-api
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-**2 — Configure environment:**
-```bash
-cp .env.example .env
-# edit .env with your settings
-```
-
-**3 — Start PostgreSQL and Redis:**
-```bash
-docker compose up -d
-```
-
-**4 — Run migrations:**
-```bash
+cp .env.example .env   
+docker compose up db redis -d
 alembic upgrade head
-```
-
-**5 — Pull Ollama model:**
-```bash
-ollama pull llama3.1
-```
-
-**6 — Start the API:**
-```bash
 uvicorn main:app --reload
 ```
 
----
+
 
 ## API Endpoints
 
@@ -146,18 +143,23 @@ uvicorn main:app --reload
 | POST | `/auth/logout` | YES | Invalidate refresh token |
 | GET | `/auth/me` | YES | Current user info |
 
-### Agent
+### V1 Agent
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/agent/run` | YES | Run agent with a question |
 | GET | `/agent/history` | YES | Get conversation history |
 | GET | `/health` | NO | Health check |
 
+### V2 Agent (Google ADK + MCP)
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| POST | `/v2/agent/run` | YES | Run V2 agent |
+
 ---
 
 ## Example
 
-**Request:**
+**V1:**
 ```bash
 curl -X POST http://localhost:8000/agent/run \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -177,47 +179,42 @@ curl -X POST http://localhost:8000/agent/run \
 }
 ```
 
----
-
-## Tools
-
-### calculator
-Safe math evaluation using Python AST — never uses eval().
+**V2:**
+```bash
+curl -X POST http://localhost:8000/v2/agent/run \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How is the weather in Baku?"}'
 ```
-input:  "2340 * 0.15"
-output: "351.0"
-```
-
-### web_search
-DuckDuckGo search — free, no API key needed.
-```
-input:  "gold price today"
-output: "Title: ...\nURL: ...\nSummary: ..."
-```
-
-### code_executor
-Safe Python execution in subprocess with timeout and import restrictions.
-```
-input:  "print(sum([1,2,3,4,5]))"
-output: "15"
+```json
+{
+  "answer": "Current weather in Baku: 11°C, cloudy, winds NNW 10-20 mph.",
+  "steps": [],
+  "session_id": "xyz-456"
+}
 ```
 
 ---
 
-## Memory Architecture
+## V1 vs V2 Comparison
+
+| | V1 LangGraph | V2 Google ADK |
+|---|---|---|
+| ReAct loop | Written manually | Handled by framework |
+| Tool registration | Manual TOOL_DESCRIPTIONS prompt | Function docstrings |
+| Tool protocol | Direct function calls | MCP protocol via FastMCP |
+| Tool discovery | Hardcoded in prompt | Dynamic via MCP server |
+| LLM | Ollama llama3.1 (local) | Groq llama-3.3-70b (cloud) |
+| Learning value | Understand internals | Understand abstractions |
+
+---
+
+## Memory Architecture (V1)
 
 ```
-Active session (Redis, TTL 24h):
-  key: session:{user_id}:{session_id}
-  value: full message history as JSON
-
-Permanent storage (PostgreSQL):
-  table: conversations
-  fields: user_id, session_id, question, answer, steps, created_at
-
-Fallback (when Redis expires):
-  load last 3 conversations from PostgreSQL
-  inject as context so LLM is not completely blank
+Active session   → Redis (TTL 24h)      key: session:{user_id}:{session_id}
+Permanent store  → PostgreSQL           table: conversations
+Fallback         → last 3 PostgreSQL conversations injected as context
 ```
 
 ---
@@ -226,16 +223,8 @@ Fallback (when Redis expires):
 
 ```bash
 pytest tests/ -v
+#28 tests passing
 ```
-
----
-
-## Branches
-
-| Branch | Description |
-|---|---|
-| `main` | V1 — LangGraph + manual tools (raw fundamentals) |
-| `feature/adk-v2` | V2 — Google ADK + MCP tools (coming soon) |
 
 ---
 
