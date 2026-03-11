@@ -46,7 +46,7 @@ def web_search(query:str)-> str:
         query: The search query string
     
     Returns:
-        Search  results as formatted text with titles, URLs and sumamries
+        Search results as formatted text with titles, URLs and sumamries
     """
     try:
         with DDGS() as ddgs:

@@ -6,7 +6,8 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
-
+    groq_api_key: str = ""
+    google_api_key: str = ""
     database_url: str = "postgresql+asyncpg://agent_user:agent_pass@localhost:5432/agent_db"
     redis_url: str = "redis://localhost:6379"
 
