@@ -7,3 +7,4 @@ alembic.ini
 *.pyc
 .pytest_cache/
 alembic/versions
+flow.txt

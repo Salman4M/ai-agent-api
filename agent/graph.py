@@ -43,20 +43,20 @@ llm = ChatOllama(
 )
 
 def reason(state: AgentState) ->  AgentState:
-    messages = [
+    system_messages = [
         {"role":"system", "content":TOOL_DESCRIPTIONS}
     ]
     #conversation history
-    messages.extend(state["messages"])
+    system_messages.extend(state["messages"])
 
     #if it's the first step , then add the question
     if not state["messages"]:
-        messages.append({
+        system_messages.append({
             "role":"user",
             "content":state["question"]
         })
 
-    response = llm.invoke(messages)
+    response = llm.invoke(system_messages)
     content = response.content.strip()
 
     #against problems in LLM output
@@ -96,6 +96,7 @@ def reason(state: AgentState) ->  AgentState:
                 "steps":state["steps"] + 1,
                 "_pending_tool": parsed,
             }
+        
     except (json.JSONDecodeError, KeyError):
         return {
             **state,
