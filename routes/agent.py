@@ -16,7 +16,7 @@ async def run(
     current_user: User = Depends(get_current_user),
     db:AsyncSession = Depends(get_db)
 ):
-    session_id = generate_session_id()
+    session_id = request.session_id or generate_session_id()
     
     result = await run_agent(
         question=request.question,

@@ -27,6 +27,7 @@ class TokenResponse(BaseModel):
 
 class AgentRequest(BaseModel):
     question:str
+    session_id:str | None = None
 
 class ToolStep(BaseModel):
     tool:str
