@@ -29,6 +29,9 @@ async def run(
     )
 
     final_answer = None
+    steps=[]
+    pending_tool_call = None
+
     async for event in runner.run_async(
         user_id=str(current_user.id),
         session_id=session.id,
@@ -37,14 +40,34 @@ async def run(
             parts=[Part(text=request.question)]
         )
     ):
-        if event.is_final_response():
-            final_answer = event.content.parts[0].text
+        if not event.content or not event.content.parts:
+            continue
+
+        part = event.content.parts[0]
+
+        if hasattr(part,"function_call") and part.function_call:
+            pending_tool_call={
+                "tool":part.function_call.name,
+                "input":str(part.function_call.args)
+            }
+        
+        elif hasattr(part,"function_response") and part.function_response:
+            if pending_tool_call:
+                steps.append(ToolStep(
+                    tool=pending_tool_call["tool"],
+                    input=pending_tool_call["input"],
+                    output=str(part.function_response.response)
+                ))
+                pending_tool_call=None
+        
+        elif event.is_final_response() and hasattr(part,"text") and part.text:
+            final_answer = part.text
     
     if not final_answer:
         raise HTTPException(status_code=500, detail="Agent failed to produce an answer.")
     
     return AgentResponse(
         answer=final_answer,
-        steps=[],
+        steps=steps,
         session_id=session_id
     )
