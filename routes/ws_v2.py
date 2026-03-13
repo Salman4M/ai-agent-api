@@ -5,7 +5,8 @@ from google.genai.types import Content, Part
 from core.security import decode_token
 from agent_v2.agent import ws_agent
 from services.memory_service import get_session_messages,save_session_messages
-
+from services.conversation_service import save_conversation
+from core.database import AsyncSessionLocal
 
 router=APIRouter(tags=["ws-v2"])
 runner=InMemoryRunner(agent=ws_agent,app_name="ai_agent_ws")
@@ -99,3 +100,23 @@ async def websocket_v2(websocket: WebSocket, session_id:str):
     except WebSocketDisconnect:
         #saving to Redis on disconnect
         await save_session_messages(user_id,session_id,history)
+
+        #saving to PostreSQL (only user and assistant messages)
+        async with AsyncSessionLocal() as db:
+            pairs = []
+            i=0
+            while i<len(history) - 1:
+                if history[i]["role"]=="user" and history[i+1]["role"] == "assistant":
+                    pairs.append((history[i]['content'],history[i+1]['content']))
+                    i+=2
+                else:
+                    i+=1
+            for question, answer in pairs:
+                await save_conversation(
+                    db=db,
+                    user_id=user_id,
+                    session_id=session_id,
+                    question=question,
+                    answer=answer,
+                    steps=[]
+                )
