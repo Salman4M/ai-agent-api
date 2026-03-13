@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter,WebSocket, WebSocketDisconnect ,Depends
 from google.adk.runners import InMemoryRunner
 from google.genai.types import Content, Part
-from core.security import get_current_user
+from core.security import decode_token
 from agent_v2.agent import ws_agent
 from services.memory_service import get_session_messages,save_session_messages
 
@@ -14,11 +14,38 @@ runner=InMemoryRunner(agent=ws_agent,app_name="ai_agent_ws")
 async def websocket_v2(websocket: WebSocket, session_id:str):
     await websocket.accept()
 
-    history = []
-    message_count = 0
-    user_id = 1  # fill fix after
+    try:
+        auth_message = await websocket.receive_text()
+        auth_data = json.loads(auth_message)
+        if auth_data.get("type") != "auth" or not auth_data.get("token"):
+            await websocket.send_text(json.dumps({
+                "type":"error",
+                "message":"First message must be auth token"
+            }))
+            await websocket.close()
+            return
+
+        payload = decode_token(auth_data["token"]) 
+        if not payload or payload.get("type")!="access":
+            await websocket.send_text(json.dumps({
+                "type":"error",
+                "message":"Invalid expired token"
+            }))
+            await websocket.close()
+            return
+
+        user_id = int(payload.get("sub"))
+        await websocket.send_text(json.dumps({
+            "type":"auth_success",
+            "user_id":user_id
+        }))
+
+    except Exception as e:
+        await websocket.close()
+        return
 
     history = await get_session_messages(user_id,session_id)
+    message_count = 0
 
     adk_session = await runner.session_service.create_session(
         app_name="ai_agent_ws",
